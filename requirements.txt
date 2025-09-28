@@ -1,3 +1,4 @@
-streamlit
-pyxform
-st-sortable
+streamlit>=1.25.0
+pyxform>=1.5.2
+st-sortable>=0.0.4
+pandas>=2.0.0
