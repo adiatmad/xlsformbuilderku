@@ -215,4 +215,111 @@ with tab2:
                     elif q["type"] == "integer":
                         answer = st.number_input("", step=1, key=q["name"])
                     elif q["type"] == "decimal":
-                        answer = st.number_input("", step=0
+                        answer = st.number_input("", step=0.01, key=q["name"])  # Perbaikan di sini
+                    elif q["type"] == "date":
+                        answer = st.date_input("", key=q["name"])
+                    elif q["type"] == "time":
+                        answer = st.time_input("", key=q["name"])
+                    elif q["type"] == "dateTime":
+                        answer = st.date_input("", key=q["name"])
+                    elif q["type"] in ["select_one", "select_multiple"]:
+                        # Ambil pilihan dari choices
+                        choices = [c for c in st.session_state.choices if c["list_name"] == q["name"]]
+                        options = {c["name"]: c["label"] for c in choices}
+                        
+                        if q["type"] == "select_one":
+                            answer = st.radio("", options=list(options.keys()), 
+                                            format_func=lambda x: options[x], key=q["name"])
+                        else:
+                            answer = st.multiselect("", options=list(options.keys()), 
+                                                  format_func=lambda x: options[x], key=q["name"])
+                    elif q["type"] == "note":
+                        st.info(q["label"])
+                        answer = None
+                    elif q["type"] == "image":
+                        answer = st.camera_input("", key=q["name"])
+                    elif q["type"] == "geopoint":
+                        answer = st.text_input("", key=q["name"])
+                    
+                    # Simpan jawaban di session state
+                    if answer is not None:
+                        st.session_state.preview_answers[q["name"]] = answer
+                    
+                    st.markdown("---")
+            
+            submitted = st.form_submit_button("Simulasi Submit")
+            if submitted:
+                st.success("Formulir berhasil disubmit (simulasi)")
+                st.json(st.session_state.preview_answers)
+
+with tab3:
+    st.header("Pengaturan Formulir")
+    
+    with st.form("settings_form"):
+        st.subheader("Informasi Formulir")
+        form_title_settings = st.text_input("Judul Formulir", value=form_title)
+        form_id_settings = st.text_input("ID Formulir", value=form_id)
+        form_version = st.text_input("Versi", value="2023.1.0")
+        
+        st.subheader("Pengaturan Lanjutan")
+        instance_name = st.text_input("Instance Name", help="Nama unik untuk setiap pengisian")
+        public_key = st.text_area("Public Key", help="Kunci publik untuk enkripsi (opsional)")
+        
+        save_settings = st.form_submit_button("Simpan Pengaturan")
+        if save_settings:
+            st.success("Pengaturan berhasil disimpan!")
+
+# Fungsi untuk membuat XLSForm
+def create_xlsform():
+    # Buat sheet survey
+    survey_df = pd.DataFrame(st.session_state.questions)
+    survey_df = survey_df[["type", "name", "label", "required", "constraint", "hint", "relevant"]]
+    
+    # Buat sheet choices
+    choices_df = pd.DataFrame(st.session_state.choices)
+    if not choices_df.empty:
+        choices_df = choices_df[["list_name", "name", "label", "filter"]]
+    
+    # Buat sheet settings
+    settings_data = {
+        "form_title": [form_title],
+        "form_id": [form_id],
+        "version": ["2023.1.0"]
+    }
+    
+    # Tambahkan pengaturan lanjutan jika ada
+    if instance_name:
+        settings_data["instance_name"] = [instance_name]
+    if public_key:
+        settings_data["public_key"] = [public_key]
+    
+    settings_df = pd.DataFrame(settings_data)
+    
+    # Buat Excel writer
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        survey_df.to_excel(writer, sheet_name='survey', index=False)
+        if not choices_df.empty:
+            choices_df.to_excel(writer, sheet_name='choices', index=False)
+        settings_df.to_excel(writer, sheet_name='settings', index=False)
+    
+    output.seek(0)
+    return output
+
+# Tombol unduh
+if st.session_state.questions:
+    st.markdown("---")
+    st.subheader("Unduh XLSForm")
+    
+    xls_file = create_xlsform()
+    st.download_button(
+        label="📥 Unduh XLSForm",
+        data=xls_file,
+        file_name=f"{form_id}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    st.success("Formulir siap diunduh! Gunakan file ini di ODK/KoboToolbox")
+
+else:
+    st.info("Tambahkan minimal satu pertanyaan untuk membuat formulir")
